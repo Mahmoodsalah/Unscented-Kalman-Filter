@@ -309,4 +309,117 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
+  //set measurement dimension, radar can measure r, phi, and r_dot
+  int n_z = 3;
+
+  //create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+
+  //create example matrix with predicted sigma points
+  MatrixXd Xsig_pred = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+
+  //measurement covariance matrix S
+  MatrixXd S = MatrixXd(n_z,n_z);
+  S.fill(0.0);
+
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred(0,i);
+    double p_y = Xsig_pred(1,i);
+    double v   = Xsig_pred(2,i);
+    double yaw = Xsig_pred(3,i);
+
+    double v1 = cos(yaw)*v;
+    double v2 = sin(yaw)*v;
+
+    // measurement model
+    Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);                        //r
+    Zsig(1,i) = atan2(p_y,p_x);                                 //phi
+    Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);   //r_dot
+  }
+
+  //calculate mean predicted measurement
+  z_pred.fill(0.0);
+
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //calculate measurement covariance matrix S
+
+  // define R
+  MatrixXd R = MatrixXd(n_z,n_z);
+  R.fill(0.0);
+  R(0,0) = std_radr_   * std_radr_;
+  R(1,1) = std_radphi_ * std_radphi_;
+  R(2,2) = std_radrd_  * std_radrd_;
+
+
+  //rsidual difference
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+
+    //angle normalization function
+    z_diff(1) = tools.NormalizeAngle(z_diff(1));
+
+
+    S =S + weights_(i) * z_diff * z_diff.transpose();
+  }
+  S = S + R;
+
+  /****************************************************************************************************
+   * cross correlation Tc
+   ***************************************************************************************************/
+
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    //rsidual difference
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred.col(i) - x_;
+
+    //angle normalizations
+    z_diff(1) = tools.NormalizeAngle(z_diff(1));
+    x_diff(3) = tools.NormalizeAngle(x_diff(3));
+
+    //Calculate Cross-correlation Matrix
+    Tc =Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+
+  /****************************************************************************************************
+  * Kalman gain K, And Update State Mean and Covariance Matrix
+  ***************************************************************************************************/
+
+  //calculate Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //create example vector for incoming radar measurement
+  VectorXd z = VectorXd(n_z);
+  z << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], meas_package.raw_measurements_[2];
+
+
+  //update state mean and covariance matrix
+  VectorXd z_diff = z - z_pred;
+  z_diff(1) = tools.NormalizeAngle(z_diff(1));
+
+
+  //Update state mean
+  x_ = x_ + K * z_diff ;
+
+  //Update covariance matrix
+  P_ = P_ - K * S * K.transpose();
+
+
+  std::cout << "x = \n" << x_ << std::endl;
+  std::cout << "P = \n" << P_ << std::endl;
+
 }
