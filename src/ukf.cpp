@@ -296,6 +296,139 @@ void UKF::Prediction(double delta_t) {
  *
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
+  // sensor state dimension
+  int n_z = 2;
+
+  //create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+
+  //create example matrix with predicted sigma points
+  MatrixXd Xsig_pred = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+
+  //measurement covariance matrix S
+  MatrixXd S = MatrixXd(n_z,n_z);
+  S.fill(0.0);
+
+  //transform sigma points into measurement space ///// begin
+  for (int i = 0; i < 2 * n_aug_ + 1; i++){  //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred(0, i);
+    double p_y = Xsig_pred(1, i);
+    double v = Xsig_pred(2, i);
+    double yaw = Xsig_pred(3, i);
+
+    // measurement model
+    //px
+    Zsig(0, i) = Xsig_pred_(0, i);
+    //py
+    Zsig(1, i) = Xsig_pred_(1, i);
+  }
+
+
+  //calculate mean predicted measurement
+  z_pred.fill(0.0);
+
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //calculate measurement covariance matrix S
+
+  // define R
+  MatrixXd R = MatrixXd(n_z,n_z);
+  R.fill(0.0);
+  R(0,0) = std_laspx_  *std_laspx_;
+  R(1,1) = std_laspy_ * std_laspy_;
+
+
+  //rsidual difference
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+
+    //angle normalization function
+    z_diff(1) = tools.NormalizeAngle(z_diff(1));
+
+
+    S =S + weights_(i) * z_diff * z_diff.transpose();
+  }
+  S = S + R;
+
+  /****************************************************************************************************
+   * cross correlation Tc
+   ***************************************************************************************************/
+
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    //rsidual difference
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred.col(i) - x_;
+
+    //angle normalizations
+    z_diff(1) = tools.NormalizeAngle(z_diff(1));
+    x_diff(3) = tools.NormalizeAngle(x_diff(3));
+
+    //Calculate Cross-correlation Matrix
+    Tc =Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+
+  /****************************************************************************************************
+  * Kalman gain K, And Update State Mean and Covariance Matrix
+  ***************************************************************************************************/
+
+  //calculate Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //create example vector for incoming radar measurement
+  VectorXd z = VectorXd(n_z);
+  z << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1];
+
+
+  //update state mean and covariance matrix
+  VectorXd z_diff = z - z_pred;
+  z_diff(1) = tools.NormalizeAngle(z_diff(1));
+
+
+  //Update state mean
+  x_ = x_ + K * z_diff ;
+
+  //Update covariance matrix
+  P_ = P_ - K * S * K.transpose();
+
+
+  NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
+
+
+
+  std::cout << "x = \n" << x_ << std::endl;
+  std::cout << "P = \n" << P_ << std::endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 }
 
@@ -417,6 +550,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   //Update covariance matrix
   P_ = P_ - K * S * K.transpose();
+
+
+  NIS_radar_ = z_diff.transpose() * S.inverse() * z_diff;
+
 
 
   std::cout << "x = \n" << x_ << std::endl;
