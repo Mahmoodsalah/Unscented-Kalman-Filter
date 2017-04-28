@@ -30,10 +30,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation (longitudinal acceleration in m/s^2)
-  std_a_ = 2.5; //original: 30
+  std_a_ = 2.5; //original: 30 try: 7  , 15 ,5 , 3 , 2
 
   // Process noise standard deviation (yaw acceleration in rad/s^2)
-  std_yawdd_ = 2; //original: 30
+  std_yawdd_ = 2; //original: 30 try:  4 , 9 , 3
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -113,11 +113,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
         px = py = 0.001;
       }
 
-      //x_ << px, py, sqrt(px*px + py*py), psi, psi_dot;
       x_ << px, py, 0, 0, 0;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      // Set state ekf_.x_ to the first measurement.
+      // Set state x_ to the first measurement.
       double px = meas_package.raw_measurements_[0];
       double py = meas_package.raw_measurements_[1];
 
@@ -185,9 +184,9 @@ void UKF::Prediction(double delta_t) {
   MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
 
   //Q matrix
-  MatrixXd Q(2, 2);
-  Q << std_a_*std_a_, 0,
-          0, std_yawdd_*std_yawdd_;
+  //MatrixXd Q(2, 2);
+  //Q << std_a_*std_a_, 0,
+   //       0, std_yawdd_*std_yawdd_;
 
   //augmented mean state
   x_aug.head(5) = x_;
@@ -195,8 +194,11 @@ void UKF::Prediction(double delta_t) {
   x_aug(6) = 0;
 
   //augmented covariance matrix
+  P_aug.fill(0.0);
   P_aug.topLeftCorner<5, 5>() = P_;
-  P_aug.bottomRightCorner<2, 2>() = Q;
+  P_aug(5,5) = std_a_*std_a_;
+  P_aug(6,6) = std_yawdd_*std_yawdd_;
+  //P_aug.bottomRightCorner<2, 2>() = Q;
 
   //square root matrix
   MatrixXd A = P_aug.llt().matrixL();
@@ -335,10 +337,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  //R << std_laspx_*std_laspx_, 0, 0, 0,
-  //    0, std_laspy_*std_laspy_, 0, 0,
-  //    0, 0, 0, 0,
-  //    0, 0, 0, 0;
   R << std_laspx_*std_laspx_, 0,
           0, std_laspy_*std_laspy_;
   S = S + R;
