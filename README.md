@@ -13,9 +13,23 @@ My Result: [0.07,0.08,0.35,0.27]
 Plots below showing how the UKF can track the moving object (bicycle) 
 
 Difference between Positions of UKF Estimation, Ground truth value and Measurment 
-![alt text]('UKFmainplot.png')
+![alt text](figures/UKFmainplot.png)
 
 Note: ground truth not appear because its totally below the UKF estimation (high accurate)
+
+
+### Consistency Check  Normalized Innovation Squared (NIS) for Radar sensor
+
+![](figures/nis_radar_output.png)
+
+so we can make sure that we not either overestimate or underestiamte the uncertainty of measurement prediction                             
+
+### Consistency Check NIS for  Lidar sensor
+
+![](figures/nis_lidar_output.png)
+
+so we can make sure that we not either overestimate or underestiamte the uncertainty of measurement prediction                             
+
 
 
 ## Dependencies
@@ -43,10 +57,7 @@ If you'd like to generate your own radar and lidar data, see the
 [utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
 Matlab scripts that can generate additional data.
 
-## Results
 
-Required result:  px, py, vx, and vy RMSE should be less than or equal to the values [.09, .10, .40, .30].
-My Result: [0.07,0.08,0.35,0.27]
 
 
 ```python
